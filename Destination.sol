@@ -49,29 +49,25 @@ contract Destination is AccessControl {
     }
 
     // Function to mint wrapped tokens for the recipient
-    function wrap(address _underlying_token, address _recipient, uint256 _amount) public onlyRole(WARDEN_ROLE) {
-        address bridgeTokenAddress = underlying_tokens[_underlying_token];
-        require(bridgeTokenAddress != address(0), "Token not registered");
-
-        // Mint the specified amount of wrapped tokens to the recipient
-        BridgeToken(bridgeTokenAddress).mint(_recipient, _amount);
-
-        // Emit the Wrap event
-        emit Wrap(_underlying_token, bridgeTokenAddress, _recipient, _amount);
-    }
+   function wrap(address _underlying_token, address _recipient, uint256 _amount) public onlyRole(WARDEN_ROLE) {
+    address bridgeTokenAddress = underlying_tokens[_underlying_token];
+    require(bridgeTokenAddress != address(0), "Token not registered");
+    
+    // Mint wrapped tokens to the recipient
+    BridgeToken(bridgeTokenAddress).mint(_recipient, _amount);
+    
+    emit Wrap(_underlying_token, bridgeTokenAddress, _recipient, _amount);
+}
 
     // Function to burn wrapped tokens from the caller and transfer the original asset to the recipient
     function unwrap(address _wrapped_token, address _recipient, uint256 _amount) public {
-        address underlyingToken = wrapped_tokens[_wrapped_token];
-        require(underlyingToken != address(0), "Token not registered");
+    address underlyingToken = wrapped_tokens[_wrapped_token];
+    require(underlyingToken != address(0), "Wrapped token not registered");
 
-        // Ensure the caller has enough balance to unwrap
-        require(BridgeToken(_wrapped_token).balanceOf(msg.sender) >= _amount, "Insufficient balance to unwrap");
+    // Burn the wrapped tokens from the sender
+    BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
 
-        // Burn the tokens from the caller
-        BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
+    emit Unwrap(underlyingToken, _wrapped_token, msg.sender, _recipient, _amount);
+}
 
-        // Emit the Unwrap event
-        emit Unwrap(underlyingToken, _wrapped_token, msg.sender, _recipient, _amount);
-    }
 }
