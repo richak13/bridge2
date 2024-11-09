@@ -56,6 +56,8 @@ contract Destination is AccessControl {
 
         // Mint the specified amount of wrapped tokens to the recipient
         BridgeToken(bridgeTokenAddress).mint(_recipient, _amount);
+        
+        // Emit Wrap event after minting
         emit Wrap(_underlying_token, bridgeTokenAddress, _recipient, _amount);
     }
 
@@ -67,6 +69,9 @@ contract Destination is AccessControl {
         require(wrapped_tokens[_wrapped_token] != address(0), "Token not registered");
 
         // Ensure only the token owner can burn their tokens
+        require(BridgeToken(_wrapped_token).balanceOf(msg.sender) >= _amount, "Insufficient balance to unwrap");
+
+        // Burn the BridgeToken from sender
         BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
 
         // Emit the Unwrap event
