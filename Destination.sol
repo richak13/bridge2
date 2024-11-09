@@ -30,6 +30,7 @@ contract Destination is AccessControl {
         string memory name,
         string memory symbol
     ) public onlyRole(CREATOR_ROLE) returns (address) {
+        require(_underlying_token != address(0), "Invalid underlying token address");
         require(underlying_tokens[_underlying_token] == address(0), "Token already created");
 
         // Deploy a new instance of BridgeToken for the underlying asset with this contract as admin
@@ -44,7 +45,7 @@ contract Destination is AccessControl {
         // Grant the Destination contract MINTER_ROLE on the new BridgeToken
         bridgeToken.grantRole(bridgeToken.MINTER_ROLE(), address(this));
 
-        // Emit the Creation event
+        // Emit the Creation event with accurate parameters
         emit Creation(_underlying_token, bridgeTokenAddress);
         return bridgeTokenAddress;
     }
@@ -69,7 +70,8 @@ contract Destination is AccessControl {
         address _recipient,
         uint256 _amount
     ) public {
-        require(wrapped_tokens[_wrapped_token] != address(0), "Token not registered");
+        address underlyingToken = wrapped_tokens[_wrapped_token];
+        require(underlyingToken != address(0), "Token not registered");
 
         // Ensure that the caller has a sufficient balance to unwrap
         require(BridgeToken(_wrapped_token).balanceOf(msg.sender) >= _amount, "Insufficient balance to unwrap");
@@ -78,6 +80,6 @@ contract Destination is AccessControl {
         BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
 
         // Emit the Unwrap event
-        emit Unwrap(wrapped_tokens[_wrapped_token], _wrapped_token, msg.sender, _recipient, _amount);
+        emit Unwrap(underlyingToken, _wrapped_token, msg.sender, _recipient, _amount);
     }
 }
