@@ -27,53 +27,44 @@ contract Destination is AccessControl {
     }
 
     // Function to create a wrapped token for the specified underlying token
-    function createToken(address _underlying_token, string memory name, string memory symbol) public onlyRole(CREATOR_ROLE) returns (address) {
-        require(_underlying_token != address(0), "Invalid underlying token address");
-        require(underlying_tokens[_underlying_token] == address(0), "Token already created");
+    
+    function createToken(
+        address underlying,
+        string memory name,
+        string memory symbol
+    ) external onlyRole(CREATOR_ROLE) returns (address) {
+        require(wrapped_tokens[underlying] == address(0), "Token already registered");
 
-        // Deploy a new BridgeToken instance with this contract as admin
-        BridgeToken bridgeToken = new BridgeToken(_underlying_token, name, symbol, address(this));
-        address bridgeTokenAddress = address(bridgeToken);
+        BridgeToken newToken = new BridgeToken(underlying, name, symbol, address(this));
+        wrapped_tokens[underlying] = address(newToken);
+        underlying_tokens[address(newToken)] = underlying;
 
-        // Register the token by updating mappings
-        underlying_tokens[_underlying_token] = bridgeTokenAddress;
-        wrapped_tokens[bridgeTokenAddress] = _underlying_token;
-
-        // Add the new BridgeToken address to the tokens array
-        tokens.push(address(bridgeToken));
-
-        // Grant the Destination contract MINTER_ROLE on the new BridgeToken
-        bridgeToken.grantRole(bridgeToken.MINTER_ROLE(), address(this));
-
-        // Emit the Creation event
-        emit Creation(_underlying_token, bridgeTokenAddress);
-        return bridgeTokenAddress;
+        emit Creation(underlying, address(newToken));
+        return address(newToken);
     }
 
-    // Function to mint wrapped tokens for the recipient
-    function wrap(address _underlying_token, address _recipient, uint256 _amount) public onlyRole(WARDEN_ROLE) {
-        address bridgeTokenAddress = underlying_tokens[_underlying_token];
-        require(bridgeTokenAddress != address(0), "Token not registered");
+    function wrap(
+        address underlying,
+        address recipient,
+        uint256 amount
+    ) external onlyRole(WARDEN_ROLE) {
+        address bridgeToken = wrapped_tokens[underlying];
+        require(bridgeToken != address(0), "Token not registered");
 
-        // Mint the specified amount of wrapped tokens to the recipient
-        BridgeToken(bridgeTokenAddress).mint(_recipient, _amount);
-
-        // Emit the Wrap event
-        emit Wrap(_underlying_token, bridgeTokenAddress, _recipient, _amount);
+        BridgeToken(bridgeToken).mint(recipient, amount);
+        emit Wrap(underlying, bridgeToken, recipient, amount);
     }
 
-    // Function to burn wrapped tokens from the caller and transfer the original asset to the recipient
-    function unwrap(address _wrapped_token, address _recipient, uint256 _amount) public {
-        address underlyingToken = wrapped_tokens[_wrapped_token];
-        require(underlyingToken != address(0), "Token not registered");
+    function unwrap(
+        address bridgeToken,
+        address recipient,
+        uint256 amount
+    ) external {
+        address underlying = underlying_tokens[bridgeToken];
+        require(underlying != address(0), "Token not registered");
+        require(BridgeToken(bridgeToken).balanceOf(msg.sender) >= amount, "Insufficient balance");
 
-        // Ensure the caller has enough balance to unwrap
-        require(BridgeToken(_wrapped_token).balanceOf(msg.sender) >= _amount, "Insufficient balance to unwrap");
-
-        // Burn the tokens from the caller
-        BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
-
-        // Emit the Unwrap event
-        emit Unwrap(underlyingToken, _wrapped_token, msg.sender, _recipient, _amount);
+        BridgeToken(bridgeToken).burnFrom(msg.sender, amount);
+        emit Unwrap(underlying, bridgeToken, msg.sender, recipient, amount);
     }
 }
